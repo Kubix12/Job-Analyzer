@@ -7,7 +7,7 @@ scrapper_offers = 1
 url_page = "https://justjoin.it/"
 
 # Database configuration
-name = 'demo'
+name = 'postgres'
 user = 'postgres'
 password = '123'
 host = 'localhost'
