@@ -54,12 +54,12 @@ def get_offer(url_page, scrapper_offers):
         job_earnings = job.find('div', class_='css-17pspck')
         if job_earnings:
             span_text = job_earnings.find_all('span')
-            if len(span_text) == 2:
+            if len(span_text) >= 2:
                 first_text = span_text[0].get_text(strip=True)
                 second_text = span_text[1].get_text(strip=True)
                 offer_data['earnings'] = [first_text, second_text]
             else:
-                offer_data['earnings'] = 'Undisclosed salary'
+                offer_data['earnings'] = ['Undisclosed salary', 'Undisclosed salary']
 
         else:
             offer_data['earnings'] = 'Undisclosed salary'
