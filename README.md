@@ -1,7 +1,6 @@
 # Job-Analyzer
 
 ## Architecture
-Create your own space in Personal Data Platform.
 
 ![Screenshot](media/app_schema.png)
 
