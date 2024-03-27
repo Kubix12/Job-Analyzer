@@ -1,69 +1,108 @@
-from bs4 import BeautifulSoup
-import requests
+from selenium import webdriver
+import time
+from selenium.webdriver.common.by import By
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
+from selenium.webdriver.common.keys import Keys
+import logging
+from selenium.common.exceptions import NoSuchElementException
+
+logging.basicConfig(level=logging.INFO)
 
 
-def get_offer(url_page, scrapper_offers):
-    page = requests.get(url_page)
-    soup = BeautifulSoup(page.content, 'html.parser')
-
-    job_list = soup.find_all('div', class_='css-2crog7')[:scrapper_offers]
-
+def get_offer(page_url, scrapper_job_offers):
     job_offers = []  # List to store multiple job offers
 
-    for job in job_list:
-        job_link = job.find("a", class_="offer_list_offer_link css-4lqp8g")
-        href = job_link.get('href')
-        if href:
-            full_url = url_page + href
-            single_job_page = requests.get(full_url)
-            single_job_soup = BeautifulSoup(single_job_page.content, 'html.parser')
+    try:
+        driver = webdriver.Edge()
+        driver.set_window_size(1200, 800)
+        driver.get(page_url)
 
-            offer_data = {}  # Dictionary to store data for a single job offer
+        offers_fetched = 0
 
-            # Extracting title from job page
-            title = single_job_soup.find("div", class_="css-vb54bv")
-            if title:
-                h1_tag = title.find('h1')
-                offer_data['title'] = h1_tag.get_text(strip=True)
+        while offers_fetched < scrapper_job_offers:
+            WebDriverWait(driver, 20).until(EC.presence_of_all_elements_located((By.CLASS_NAME, 'css-2crog7')))
 
-            # Extracting company from job page
-            company = single_job_soup.find('div', class_='css-mbkv7r')
-            offer_data['company'] = company.get_text(strip=True) if company else "No company found"
+            # Find all job offers on the page
+            job_offers_list = driver.find_elements(By.CLASS_NAME, 'css-2crog7')[:scrapper_job_offers]
 
-            # Extracting type of work, experience, employment type, operating mode
-            description_work = {}
-            type_work = single_job_soup.find_all("div", class_="css-6q28fo")
-            for data in type_work:
-                description = data.find('div', class_="css-qyml61").text
-                rest = data.find('div', class_="css-15wyzmd").text
-                description_work[description] = rest
-            offer_data['description'] = description_work
+            for job in job_offers_list:
+                if offers_fetched >= scrapper_job_offers:
+                    break
 
-            # Extracting stack
-            stack_list = {}
-            stack_description = single_job_soup.find_all("div", class_="css-cjymd2")
-            for stack in stack_description:
-                technology = stack.find("h6", class_="MuiTypography-root MuiTypography-subtitle2 css-x1xnx3").text
-                technology_level = stack.find('span',
-                                              class_="MuiTypography-root MuiTypography-subtitle4 css-1wcj8lw").text
+                job_link = job.find_element(By.CLASS_NAME, "offer_list_offer_link.css-4lqp8g")
+                href = job_link.get_attribute('href')
+                if href:
+                    driver.execute_script("window.open('');")
+                    driver.switch_to.window(driver.window_handles[1])
+                    driver.get(href)
 
-                stack_list[technology] = technology_level
-            offer_data['stack'] = stack_list
+                    offer_data = {}  # Dictionary to store data for a single job offer
 
-        # Extracting earnings from job page
-        job_earnings = job.find('div', class_='css-17pspck')
-        if job_earnings:
-            span_text = job_earnings.find_all('span')
-            if len(span_text) >= 2:
-                first_text = span_text[0].get_text(strip=True)
-                second_text = span_text[1].get_text(strip=True)
-                offer_data['earnings'] = [first_text, second_text]
-            else:
-                offer_data['earnings'] = ['Undisclosed salary', 'Undisclosed salary']
+                    # Extract title from job page
+                    title = driver.find_element(By.CLASS_NAME, "css-vb54bv")
+                    offer_data['title'] = title.find_element(By.TAG_NAME, 'h1').text.strip()
 
-        else:
-            offer_data['earnings'] = 'Undisclosed salary'
+                    # Extract company from job page
+                    company = driver.find_element(By.CLASS_NAME, 'css-mbkv7r')
+                    offer_data['company'] = company.text.strip() if company else "Company not found"
 
-        job_offers.append(offer_data)
+                    time.sleep(2)
+
+                    # Extract type of work, experience, employment type, operating mode
+                    description_job_offer = {}
+                    type_work_elements = driver.find_elements(By.CSS_SELECTOR, '.css-6q28fo')
+                    for data in type_work_elements:
+                        try:
+                            description = data.find_element(By.CSS_SELECTOR, '.css-qyml61').text
+                            rest = data.find_element(By.CSS_SELECTOR, '.css-15wyzmd').text
+                            description_job_offer[description] = rest
+
+                        except Exception as e:
+                            logging.error(f"An error occurred while extracting type of work data: {e}")
+
+                    offer_data['description'] = description_job_offer
+
+                    # Extract stack from job page
+                    stack_list = {}
+                    stack_description = driver.find_elements(By.CLASS_NAME, 'css-cjymd2')
+                    for stack in stack_description:
+                        technology = stack.find_element(By.TAG_NAME, 'h6').text
+                        technology_level = stack.find_element(By.TAG_NAME, 'span').text
+
+                        stack_list[technology] = technology_level
+                    offer_data['stack'] = stack_list
+
+                    # Extract earnings from job page
+                    try:
+                        job_earnings = driver.find_element(By.CLASS_NAME, 'css-j7qwjs')
+
+                        span_elements = job_earnings.find_elements(By.TAG_NAME, 'span')
+
+                        if span_elements:
+                            first_salary = span_elements[1].text.strip()
+                            second_salary = span_elements[2].text.strip()
+                            offer_data['earnings'] = [first_salary, second_salary]
+                        else:
+                            offer_data['earnings'] = ['Undisclosed salary', 'Undisclosed salary']
+
+                    except NoSuchElementException:
+                        offer_data['earnings'] = ['Undisclosed salary', 'Undisclosed salary']
+
+                    job_offers.append(offer_data)
+                    offers_fetched += 1
+                    driver.close()
+                    driver.switch_to.window(driver.window_handles[0])
+
+            if offers_fetched < scrapper_job_offers:
+                driver.find_element(By.TAG_NAME, 'body').send_keys(Keys.END)
+                time.sleep(2)
+
+    except Exception as e:
+        logging.error(f"An error occurred: {e}")
+
+    finally:
+        if 'driver' in locals():
+            driver.quit()
 
     return job_offers
