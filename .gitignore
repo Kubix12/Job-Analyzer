@@ -160,4 +160,4 @@ cython_debug/
 .idea/
 
 # Exclude msedgedriver executable
-msedgedriver.exe
+Edge_driver/msedgedriver.exe
